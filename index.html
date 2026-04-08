@@ -815,14 +815,14 @@ async function processQueue() {
 async function runEffect({ playerName, type, champ, summoner }) {
   const isWin = type === 'win';
 
-  // 1. Drive 이미지 (1초) - URL 직접 방식
+  // 1. Drive 이미지 - 완전히 로드된 후 표시 (1초)
   if (cfg.webappUrl && cfg.webappUrl !== 'YOUR_WEBAPP_URL' && playerName) {
     try {
       const res = await fetch(`${cfg.webappUrl}?action=image&player=${encodeURIComponent(playerName)}&t=${Date.now()}`);
       const imgData = await res.json();
       if (imgData.imageUrl) {
-        showImage(imgData.imageUrl, isWin);
-        await sleep(1000);
+        await showImage(imgData.imageUrl, isWin); // 로드 완료까지 대기
+        await sleep(2000);
         hideImage();
       }
     } catch(e) { console.warn('이미지 실패:', e); }
@@ -833,7 +833,6 @@ async function runEffect({ playerName, type, champ, summoner }) {
   if (summoner && cfg.riotKey && cfg.riotKey !== 'YOUR_RIOT_API_KEY') {
     try { matchData = await fetchLastMatch(summoner); } catch(e) { console.warn('Riot API 실패:', e); }
   }
-  // 챔피언 입력값 우선
   if (!matchData && champ) matchData = { champion: champ };
 
   // 3. 결과 이펙트 (2초)
@@ -843,12 +842,28 @@ async function runEffect({ playerName, type, champ, summoner }) {
   hideResult();
 }
 
-// ── 이미지 표시 ───────────────────────────────────────────────────────────────
-function showImage(dataUrl, isWin) {
-  const img = document.getElementById('overlayImg');
-  img.src = dataUrl;
-  img.style.boxShadow = `0 0 40px ${isWin ? 'rgba(11,196,227,0.6)' : 'rgba(232,64,87,0.6)'}`;
-  document.getElementById('imgOverlay').classList.add('show');
+// ── 이미지 표시 (로드 완료 후 표시) ─────────────────────────────────────────
+function showImage(url, isWin) {
+  return new Promise((resolve) => {
+    const img = document.getElementById('overlayImg');
+    const overlay = document.getElementById('imgOverlay');
+
+    // 크기를 scoreboard-wrap에 맞게 설정
+    const wrap = document.getElementById('scoreboardWrap');
+    if (wrap) {
+      const rect = wrap.getBoundingClientRect();
+      overlay.style.width  = rect.width  + 'px';
+      overlay.style.height = rect.height + 'px';
+    }
+
+    img.onload = () => {
+      overlay.classList.add('show');
+      resolve();
+    };
+    img.onerror = () => resolve(); // 실패해도 진행
+    img.src = url;
+    img.style.boxShadow = `0 0 40px ${isWin ? 'rgba(11,196,227,0.6)' : 'rgba(232,64,87,0.6)'}`;
+  });
 }
 function hideImage() { document.getElementById('imgOverlay').classList.remove('show'); }
 
@@ -856,6 +871,15 @@ function hideImage() { document.getElementById('imgOverlay').classList.remove('s
 function showResult(playerName, isWin, matchData) {
   const cls = isWin ? 'win' : 'lose';
   const color = isWin ? 'var(--blue)' : 'var(--red)';
+
+  // 오버레이 크기를 표에 맞게 동적 설정
+  const wrap = document.getElementById('scoreboardWrap');
+  const overlay = document.getElementById('resultOverlay');
+  if (wrap) {
+    const rect = wrap.getBoundingClientRect();
+    overlay.style.width  = rect.width  + 'px';
+    overlay.style.height = rect.height + 'px';
+  }
 
   document.getElementById('resultBg').className = 'result-bg ' + cls;
   document.getElementById('resultText').className = 'result-text ' + cls;
