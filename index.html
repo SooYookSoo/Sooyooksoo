@@ -448,6 +448,12 @@
         </div>
         <button class="btn blue" onclick="saveCfg()" style="margin-top:6px;">저장</button>
       </div>
+      <div class="config-box">
+        <h3>▸ 소환사명 설정 (플레이어 이름 → 소환사명#태그)</h3>
+        <div id="summonerInputs" style="display:flex;flex-direction:column;gap:5px;"></div>
+        <button class="btn blue" onclick="saveSummoners()" style="margin-top:8px;">저장</button>
+        <div class="success-msg" id="summonerSaved"></div>
+      </div>
     </div>
   </div>
 
@@ -511,6 +517,7 @@ let state = {
 let cfg = {
   webappUrl: localStorage.getItem('webappUrl') || PRESET.webappUrl,
   riotKey:   localStorage.getItem('riotKey')   || PRESET.riotKey,
+  summoners: JSON.parse(localStorage.getItem('summoners') || 'null') || {...PRESET.summoners},
 };
 
 // 이펙트 큐
@@ -539,6 +546,7 @@ function switchTab(name) {
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'config') renderSummonerInputs();
 }
 
 // ── 모드 설정 ─────────────────────────────────────────────────────────────────
@@ -663,8 +671,8 @@ function renderInputPanel() {
 function updatePlayerName(team, idx, value) {
   const players = team === 1 ? state.team1.players : state.team2.players;
   players[idx].name = value;
-  // 소환사명 자동 매핑
-  if (PRESET.summoners[value]) players[idx].summoner = PRESET.summoners[value];
+  // 소환사명 자동 매핑 (cfg.summoners 우선, PRESET 차선)
+  players[idx].summoner = cfg.summoners[value] || PRESET.summoners[value] || '';
   renderScoreboard();
 }
 
@@ -944,6 +952,53 @@ function saveCfg() {
   localStorage.setItem('riotKey', cfg.riotKey);
   document.getElementById('cfgSaved').textContent = '✓ 저장됨';
   setTimeout(() => document.getElementById('cfgSaved').textContent = '', 2000);
+}
+
+// ── 소환사명 입력 UI 렌더링 ───────────────────────────────────────────────────
+function renderSummonerInputs() {
+  const allPlayers = [
+    ...state.team1.players,
+    ...state.team2.players,
+  ].filter(p => p.name);
+
+  // 이름 없는 경우 PRESET 키로 보완
+  const names = allPlayers.length > 0
+    ? [...new Set(allPlayers.map(p => p.name))]
+    : Object.keys(PRESET.summoners);
+
+  const el = document.getElementById('summonerInputs');
+  if (!el) return;
+  el.innerHTML = names.map(name => `
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-family:'Black Han Sans',sans-serif;font-size:13px;color:var(--gold);min-width:50px;">${name}</span>
+      <input type="text" id="si_${name}" value="${cfg.summoners[name] || PRESET.summoners[name] || ''}"
+        placeholder="${name}#KR1" style="flex:1;">
+    </div>
+  `).join('');
+}
+
+function saveSummoners() {
+  const allPlayers = [
+    ...state.team1.players,
+    ...state.team2.players,
+  ].filter(p => p.name);
+  const names = allPlayers.length > 0
+    ? [...new Set(allPlayers.map(p => p.name))]
+    : Object.keys(PRESET.summoners);
+
+  names.forEach(name => {
+    const el = document.getElementById('si_' + name);
+    if (el) {
+      cfg.summoners[name] = el.value.trim();
+      // 플레이어 객체에도 반영
+      [...state.team1.players, ...state.team2.players]
+        .filter(p => p.name === name)
+        .forEach(p => p.summoner = cfg.summoners[name]);
+    }
+  });
+  localStorage.setItem('summoners', JSON.stringify(cfg.summoners));
+  document.getElementById('summonerSaved').textContent = '✓ 저장됨';
+  setTimeout(() => document.getElementById('summonerSaved').textContent = '', 2000);
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────────────────────
