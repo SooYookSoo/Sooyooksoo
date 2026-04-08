@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>솔랭내기</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #C8AA6E;
+    --gold-light: #F0E6D3;
+    --gold-dark: #785A28;
+    --blue: #0BC4E3;
+    --red: #E84057;
+    --bg: #010A13;
+    --panel: #0A1428;
+    --border: #1E2D40;
+    --text-sub: #7A9DB5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--gold);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(11,196,227,0.03) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 50%, rgba(200,170,110,0.03) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+  .app { position: relative; z-index: 1; }
+
+  /* 헤더 */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 10px; border-bottom: 1px solid var(--border);
+  }
+  .header-title {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 13px; color: var(--gold); letter-spacing: 3px;
+    text-shadow: 0 0 12px rgba(200,170,110,0.4);
+  }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+
+  /* 탭 */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 8px; }
+  .tab {
+    padding: 5px 12px; font-size: 10px; letter-spacing: 1px;
+    color: var(--text-sub); cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.2s; text-transform: uppercase;
+  }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* 버튼 */
+  .btn {
+    padding: 3px 8px; border: 1px solid var(--gold-dark);
+    background: linear-gradient(180deg, #1a1200, #0d0a00);
+    color: var(--gold); font-family: 'Noto Sans KR', sans-serif;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer; border-radius: 2px; transition: all 0.2s; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--gold); }
+  .btn.blue { border-color: var(--blue); color: var(--blue); background: linear-gradient(180deg, #0a1e2a, #050f15); }
+  .btn.red { border-color: var(--red); color: var(--red); background: linear-gradient(180deg, #2a0a10, #1a0508); }
+  .btn.sm { padding: 2px 6px; font-size: 9px; }
+
+  /* ── 스코어보드 탭 ── */
+  .scoreboard { padding: 4px 6px; display: inline-block; }
+
+  .score-title-bar {
+    text-align: center; padding: 3px 0 4px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 12px; letter-spacing: 2px; color: var(--gold);
+    text-shadow: 0 0 10px rgba(200,170,110,0.35);
+    white-space: nowrap;
+  }
+
+  .scoreboard-wrap { position: relative; display: inline-block; }
+
+  /* 스코어 테이블 */
+  .sb-table {
+    width: auto; border-collapse: collapse;
+    border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+    background: var(--panel);
+  }
+  .sb-table th {
+    padding: 4px 10px; font-size: 9px; letter-spacing: 2px;
+    text-transform: uppercase; font-weight: 700; border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.3);
+  }
+  .sb-table th.th-name-l { text-align: right; color: var(--blue); }
+  .sb-table th.th-name-r { text-align: left; color: var(--red); }
+  .sb-table th.th-num { text-align: center; min-width: 40px; }
+  .sb-table th.w-l { color: rgba(11,196,227,0.8); }
+  .sb-table th.l-l { color: rgba(232,64,87,0.7); border-right: 2px solid rgba(200,170,110,0.2); }
+  .sb-table th.w-r { color: rgba(11,196,227,0.8); }
+  .sb-table th.l-r { color: rgba(232,64,87,0.7); }
+  .sb-table td {
+    padding: 5px 10px; font-size: 13px; font-weight: 700;
+    border-bottom: 1px solid rgba(30,45,64,0.4); text-align: center;
+  }
+  .sb-table td.p-name-l {
+    text-align: right; font-family: 'Black Han Sans', sans-serif;
+    font-size: 14px; color: var(--gold-light); letter-spacing: 1px;
+  }
+  .sb-table td.p-name-r {
+    text-align: left; font-family: 'Black Han Sans', sans-serif;
+    font-size: 14px; color: var(--gold-light); letter-spacing: 1px;
+  }
+  .sb-table td.win-n { color: var(--blue); text-shadow: 0 0 6px rgba(11,196,227,0.35); }
+  .sb-table td.lose-n { color: var(--red); text-shadow: 0 0 6px rgba(232,64,87,0.35); }
+  .sb-table td.divider-col { border-right: 2px solid rgba(200,170,110,0.2); }
+  .sb-table tr:last-child td { border-bottom: none; }
+  .sb-table tr.total-row td {
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.25);
+    font-size: 12px; color: var(--gold); padding: 4px 10px;
+  }
+  .sb-table tr.total-row td.p-name-l,
+  .sb-table tr.total-row td.p-name-r { font-size: 12px; color: var(--gold); letter-spacing: 2px; }
+
+  .bottom-bar {
+    padding: 4px 6px; display: flex; align-items: center; gap: 6px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── 입력 탭 ── */
+  .input-panel { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+
+  /* 모드 선택 */
+  .mode-select { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .mode-label { font-size: 10px; color: var(--text-sub); letter-spacing: 2px; margin-right: 4px; }
+  .mode-btn {
+    padding: 4px 10px; border: 1px solid var(--border);
+    background: rgba(0,0,0,0.3); color: var(--text-sub);
+    font-family: 'Black Han Sans', sans-serif; font-size: 11px; letter-spacing: 1px;
+    cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  }
+  .mode-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(200,170,110,0.08); }
+
+  /* 상단 설정 행 */
+  .top-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .ctrl-group { display: flex; align-items: center; gap: 6px; }
+  .ctrl-label { font-size: 10px; color: var(--text-sub); letter-spacing: 1px; white-space: nowrap; }
+  input[type="text"] {
+    background: rgba(0,0,0,0.4); border: 1px solid var(--border);
+    border-radius: 2px; color: #fff; padding: 4px 8px;
+    font-size: 11px; font-family: 'Noto Sans KR', sans-serif;
+    outline: none; transition: border-color 0.2s; width: 100px;
+  }
+  input[type="text"]:focus { border-color: var(--gold); }
+  input[type="text"]::placeholder { color: #2a3a4a; }
+  .title-input { width: 180px !important; }
+  .team-input { width: 90px !important; }
+
+  /* 라운드 네비 */
+  .round-nav { display: flex; align-items: center; gap: 5px; }
+  .round-num {
+    font-family: 'Black Han Sans', sans-serif; font-size: 14px;
+    color: var(--gold); min-width: 22px; text-align: center;
+  }
+
+  /* 입력 테이블 - 스프레드시트 스타일 */
+  .input-table {
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+    background: var(--panel);
+  }
+  .input-table th {
+    padding: 4px 8px; font-size: 10px; letter-spacing: 2px;
+    font-weight: 700; border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.3); text-align: center; white-space: nowrap;
+  }
+  .input-table th.th-team1 { color: var(--blue); }
+  .input-table th.th-team2 { color: var(--red); }
+  .input-table th.th-center {
+    color: var(--text-sub); border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border); background: rgba(0,0,0,0.4);
+  }
+  .input-table th.th-win { color: rgba(11,196,227,0.8); min-width: 28px; }
+  .input-table th.th-lose { color: rgba(232,64,87,0.7); min-width: 28px; }
+  .input-table th.th-pname { color: var(--gold-light); min-width: 50px; }
+
+  .input-table td {
+    padding: 3px 4px; border-bottom: 1px solid rgba(30,45,64,0.35);
+    text-align: center; vertical-align: middle;
+  }
+  .input-table tr:last-child td { border-bottom: none; }
+  .input-table td.td-center {
+    border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+    background: rgba(0,0,0,0.25);
+    font-family: 'Black Han Sans', sans-serif; font-size: 11px;
+    color: var(--text-sub); min-width: 28px;
+  }
+  .input-table td.td-total {
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.25);
+    font-family: 'Black Han Sans', sans-serif; font-size: 11px; color: var(--gold);
+  }
+  .input-table tr.total-input-row td { border-top: 1px solid var(--border); }
+
+  /* 이름 입력 */
+  .name-inp {
+    background: transparent; border: none; border-bottom: 1px solid transparent;
+    color: var(--gold-light); font-family: 'Black Han Sans', sans-serif;
+    font-size: 13px; letter-spacing: 1px; text-align: center;
+    padding: 1px 3px; width: 54px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .name-inp:focus { border-bottom-color: var(--gold); }
+  .name-inp::placeholder { color: #2a3a4a; font-size: 10px; font-family: 'Noto Sans KR', sans-serif; }
+
+  /* 체크 버튼 */
+  .ck {
+    width: 24px; height: 20px; border-radius: 2px; cursor: pointer;
+    font-size: 10px; font-weight: 900; border: 1px solid;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.15s; font-family: 'Black Han Sans', sans-serif;
+  }
+  .ck.w {
+    border-color: rgba(11,196,227,0.3); color: rgba(11,196,227,0.35);
+    background: rgba(11,196,227,0.03);
+  }
+  .ck.w:hover, .ck.w.on {
+    border-color: var(--blue); color: var(--blue);
+    background: rgba(11,196,227,0.15); box-shadow: 0 0 5px rgba(11,196,227,0.3);
+  }
+  .ck.l {
+    border-color: rgba(232,64,87,0.3); color: rgba(232,64,87,0.35);
+    background: rgba(232,64,87,0.03);
+  }
+  .ck.l:hover, .ck.l.on {
+    border-color: var(--red); color: var(--red);
+    background: rgba(232,64,87,0.15); box-shadow: 0 0 5px rgba(232,64,87,0.3);
+  }
+
+  /* 총합 숫자 */
+  .score-num { font-family: 'Black Han Sans', sans-serif; font-size: 13px; }
+  .score-num.w { color: var(--blue); }
+  .score-num.l { color: var(--red); }
+
+  /* 설정 패널 */
+  .config-panel { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .config-box {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; padding: 10px 12px;
+  }
+  .config-box h3 { font-size: 10px; letter-spacing: 3px; color: var(--text-sub); margin-bottom: 8px; text-transform: uppercase; }
+  .input-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .input-label { font-size: 11px; color: var(--gold); min-width: 60px; font-weight: 700; }
+  .error-msg { font-size: 10px; color: var(--red); margin-top: 4px; }
+  .success-msg { font-size: 10px; color: #00ff88; margin-top: 4px; }
+
+  /* ── 오버레이 ── */
+  .img-overlay {
+    position: absolute; inset: 0; z-index: 900;
+    display: flex; justify-content: center; align-items: center;
+    background: rgba(1,10,19,0.5);
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    border-radius: 4px; overflow: hidden;
+  }
+  .img-overlay.show { opacity: 1; }
+  .img-overlay img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+    animation: imgPop 0.3s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
+  }
+  @keyframes imgPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .result-overlay {
+    position: absolute; inset: 0; z-index: 1000;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    border-radius: 4px; overflow: hidden;
+  }
+  .result-overlay.show { opacity: 1; }
+  .result-bg { position: absolute; inset: 0; backdrop-filter: blur(2px); }
+  .result-bg.win { background: radial-gradient(ellipse at center, rgba(11,196,227,0.25) 0%, rgba(1,10,19,0.92) 70%); }
+  .result-bg.lose { background: radial-gradient(ellipse at center, rgba(232,64,87,0.25) 0%, rgba(1,10,19,0.92) 70%); }
+
+  .result-content {
+    position: relative; z-index: 2; text-align: center; padding: 8px;
+    animation: resultPop 0.35s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
+  }
+  @keyframes resultPop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .result-text {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(24px, 5vw, 52px); line-height: 1; letter-spacing: 4px;
+    animation: textPulse 0.7s ease-in-out infinite alternate;
+  }
+  .result-text.win { color: #fff; text-shadow: 0 0 20px var(--blue), 0 0 50px var(--blue); }
+  .result-text.lose { color: #fff; text-shadow: 0 0 20px var(--red), 0 0 50px var(--red); }
+  @keyframes textPulse { from { transform: scale(1); } to { transform: scale(1.04); filter: brightness(1.3); } }
+
+  .result-divider { height: 1px; margin: 5px auto; width: 0; animation: divExpand 0.4s 0.15s forwards; }
+  .result-divider.win { background: linear-gradient(90deg, transparent, var(--blue), #fff, var(--blue), transparent); box-shadow: 0 0 8px var(--blue); }
+  .result-divider.lose { background: linear-gradient(90deg, transparent, var(--red), #fff, var(--red), transparent); box-shadow: 0 0 8px var(--red); }
+  @keyframes divExpand { to { width: 80%; } }
+
+  .result-player {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(14px, 2.5vw, 28px); letter-spacing: 3px;
+    animation: slideUp 0.4s 0.1s both;
+  }
+  .result-player.win { color: #90e8f8; text-shadow: 0 0 12px rgba(11,196,227,0.5); }
+  .result-player.lose { color: #f8a0aa; text-shadow: 0 0 12px rgba(232,64,87,0.5); }
+
+  .result-champ {
+    font-size: clamp(10px, 1.5vw, 15px); font-weight: 900; letter-spacing: 3px;
+    margin-top: 2px; color: var(--gold); animation: slideUp 0.4s 0.2s both;
+  }
+  .result-stats {
+    display: flex; gap: clamp(8px, 2vw, 20px); justify-content: center; margin-top: 6px;
+    animation: slideUp 0.4s 0.3s both;
+  }
+  .stat { text-align: center; }
+  .stat-label { font-size: clamp(7px, 1vw, 9px); letter-spacing: 2px; color: var(--text-sub); margin-bottom: 1px; text-transform: uppercase; }
+  .stat-value { font-family: 'Black Han Sans', sans-serif; font-size: clamp(12px, 2.5vw, 20px); color: var(--gold-light); }
+  .stat-value.blue { color: var(--blue); }
+  .stat-value.red { color: var(--red); }
+
+  @keyframes slideUp { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .corner { position: absolute; width: 16px; height: 16px; opacity: 0; animation: cornerPop 0.3s 0.1s both; }
+  .corner.tl { top: 3px; left: 3px; border-top: 2px solid; border-left: 2px solid; }
+  .corner.tr { top: 3px; right: 3px; border-top: 2px solid; border-right: 2px solid; }
+  .corner.bl { bottom: 3px; left: 3px; border-bottom: 2px solid; border-left: 2px solid; }
+  .corner.br { bottom: 3px; right: 3px; border-bottom: 2px solid; border-right: 2px solid; }
+  @keyframes cornerPop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 0.85; } }
+
+  .particles { position: absolute; inset: 0; pointer-events: none; z-index: 950; overflow: hidden; border-radius: 4px; }
+  .particle { position: absolute; border-radius: 50%; animation: pFloat linear forwards; opacity: 0; }
+  @keyframes pFloat {
+    0% { transform: translateY(100%) scale(0); opacity: 0; }
+    10% { opacity: 1; } 90% { opacity: 1; }
+    100% { transform: translateY(-10%) scale(1); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="header-title">⚔ 솔랭내기</div>
+    <div class="header-right">
+      <button class="btn sm" onclick="resetAllScores()" style="border-color:var(--red);color:var(--red);">초기화</button>
+    </div>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('score')">송출화면</div>
+    <div class="tab" onclick="switchTab('input')">입력</div>
+    <div class="tab" onclick="switchTab('config')">설정</div>
+  </div>
+
+  <!-- 송출화면 탭 -->
+  <div class="tab-content active" id="tab-score">
+    <div class="scoreboard">
+      <div class="score-title-bar" id="scoreTitleBar">⚔ 솔랭내기</div>
+      <div class="scoreboard-wrap" id="scoreboardWrap">
+        <div id="scoreboardContent"></div>
+        <div class="img-overlay" id="imgOverlay"><img id="overlayImg" src="" alt=""></div>
+        <div class="particles" id="particles"></div>
+        <div class="result-overlay" id="resultOverlay">
+          <div class="result-bg" id="resultBg"></div>
+          <div class="corner tl" id="cornerTL" style="border-color:transparent"></div>
+          <div class="corner tr" id="cornerTR" style="border-color:transparent"></div>
+          <div class="corner bl" id="cornerBL" style="border-color:transparent"></div>
+          <div class="corner br" id="cornerBR" style="border-color:transparent"></div>
+          <div class="result-content">
+            <div class="result-text" id="resultText"></div>
+            <div class="result-divider" id="resultDivider"></div>
+            <div class="result-player" id="resultPlayer"></div>
+            <div class="result-champ" id="resultChamp"></div>
+            <div class="result-stats" id="resultStats"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn" onclick="testEffect(true)">🔵 승리 테스트</button>
+      <button class="btn" onclick="testEffect(false)">🔴 패배 테스트</button>
+    </div>
+  </div>
+
+  <!-- 입력 탭 -->
+  <div class="tab-content" id="tab-input">
+    <div class="input-panel">
+
+      <!-- 모드 선택 -->
+      <div class="mode-select">
+        <span class="mode-label">모드</span>
+        <button class="mode-btn" onclick="setMode('2vs2')">2vs2</button>
+        <button class="mode-btn active" onclick="setMode('3vs3')">3vs3</button>
+        <button class="mode-btn" onclick="setMode('4vs4')">4vs4</button>
+        <button class="mode-btn" onclick="setMode('5vs5')">5vs5</button>
+        <button class="mode-btn" onclick="setMode('6vs6')">6vs6</button>
+      </div>
+
+      <!-- 상단 컨트롤 -->
+      <div class="top-controls">
+        <div class="ctrl-group">
+          <span class="ctrl-label">제목</span>
+          <input type="text" id="titleInput" class="title-input" placeholder="[N판/N판] 솔랭내기" oninput="applyTitle()">
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label" style="color:var(--blue);">팀1</span>
+          <input type="text" id="team1Name" class="team-input" placeholder="팀1 이름" oninput="applyTeamNames()">
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label" style="color:var(--red);">팀2</span>
+          <input type="text" id="team2Name" class="team-input" placeholder="팀2 이름" oninput="applyTeamNames()">
+        </div>
+      </div>
+
+      <!-- 입력 테이블 -->
+      <div id="inputTableWrap"></div>
+
+    </div>
+  </div>
+
+  <!-- 설정 탭 -->
+  <div class="tab-content" id="tab-config">
+    <div class="config-panel">
+      <div class="config-box">
+        <h3>▸ Drive 이미지 (Apps Script 웹앱)</h3>
+        <div class="input-row">
+          <span class="input-label">웹앱 URL</span>
+          <input type="text" id="cfgWebappUrl" placeholder="Apps Script 웹앱 URL" style="flex:1;">
+        </div>
+        <button class="btn blue" onclick="saveCfg()" style="margin-top:6px;">저장</button>
+        <div class="success-msg" id="cfgSaved"></div>
+      </div>
+      <div class="config-box">
+        <h3>▸ Riot API</h3>
+        <div class="input-row">
+          <span class="input-label">API 키</span>
+          <input type="text" id="cfgRiotKey" placeholder="RGAPI-xxxx-..." style="flex:1;">
+        </div>
+        <button class="btn blue" onclick="saveCfg()" style="margin-top:6px;">저장</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ================================================================
+// ★ 매니저 설정란 - 여기만 수정하면 됩니다 ★
+// ================================================================
+const PRESET = {
+  webappUrl: 'YOUR_WEBAPP_URL',   // Apps Script 웹앱 URL (이미지용)
+  riotKey:   'YOUR_RIOT_API_KEY', // Riot API 키
+  // 플레이어별 소환사명 (이름: '소환사명#태그')
+  summoners: {
+    '수야':  '수야#KR1',
+    '하루':  '하루#KR1',
+    '현진':  '현진#KR1',
+    '호시':  '호시#KR1',
+    '레오':  '레오#KR1',
+    '에필':  '에필#KR1',
+    '시안':  '시안#KR1',
+    '세나':  '세나#KR1',
+    '야옹':  '야옹#KR1',
+    '멍멍':  '멍멍#KR1',
+    '츄르':  '츄르#KR1',
+    '르키':  '르키#KR1',
+    '비키':  '비키#KR1',
+    '말말':  '말말#KR1',
+    '웡웡':  '웡웡#KR1',
+    '이라':  '이라#KR1',
+    '상윤':  '상윤#KR1',
+    '경호':  '경호#KR1',
+    '태민':  '태민#KR1',
+    '라뎃':  '라뎃#KR1',
+    '깐숙':  '깐숙#KR1',
+    '민규':  '민규#KR1',
+    '축축':  '축축#KR1',
+  }
+};
+// ================================================================
+
+// ── 모드별 플레이어 수 ─────────────────────────────────────────────────────────
+const MODE_CONFIG = {
+  '2vs2': { perTeam: 2, rounds: 10 },
+  '3vs3': { perTeam: 3, rounds: 10 },
+  '4vs4': { perTeam: 4, rounds: 10 },
+  '5vs5': { perTeam: 5, rounds: 10 },
+  '6vs6': { perTeam: 6, rounds: 10 },
+};
+
+// ── 게임 상태 ─────────────────────────────────────────────────────────────────
+let state = {
+  mode: '3vs3',
+  title: '[N판/N판] 솔랭내기',
+  team1: { name: '팀1', players: [] },
+  team2: { name: '팀2', players: [] },
+  currentRound: 1,
+  // players: [{ name, summoner, champ, wins, losses, checks: [{round, type, champ}] }]
+};
+
+let cfg = {
+  webappUrl: localStorage.getItem('webappUrl') || PRESET.webappUrl,
+  riotKey:   localStorage.getItem('riotKey')   || PRESET.riotKey,
+};
+
+// 이펙트 큐
+const effectQueue = [];
+let isEffectRunning = false;
+
+// ── 초기화 ────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  // 설정 탭 입력값
+  document.getElementById('cfgWebappUrl').value = cfg.webappUrl;
+  document.getElementById('cfgRiotKey').value   = cfg.riotKey;
+
+  // 입력 탭은 setMode가 renderInputPanel 호출하므로 한번에 처리
+  setMode('3vs3');
+
+  // 초기 팀명 입력란 값 설정
+  document.getElementById('team1Name').value = state.team1.name;
+  document.getElementById('team2Name').value = state.team2.name;
+  document.getElementById('titleInput').value = state.title;
+};
+
+// ── 탭 ────────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['score','input','config'][i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── 모드 설정 ─────────────────────────────────────────────────────────────────
+function setMode(mode) {
+  state.mode = mode;
+  const cfg2 = MODE_CONFIG[mode];
+  const perTeam = cfg2.perTeam;
+
+  // 모드 버튼 활성화
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase() === mode.toLowerCase());
+  });
+
+  // 플레이어 수 맞추기 (기존 데이터 유지)
+  while (state.team1.players.length < perTeam) {
+    state.team1.players.push({ name: '', summoner: '', champ: '', wins: 0, losses: 0, checks: [] });
+  }
+  while (state.team2.players.length < perTeam) {
+    state.team2.players.push({ name: '', summoner: '', champ: '', wins: 0, losses: 0, checks: [] });
+  }
+  state.team1.players = state.team1.players.slice(0, perTeam);
+  state.team2.players = state.team2.players.slice(0, perTeam);
+
+  renderInputPanel();
+  renderScoreboard();
+}
+
+// ── 입력 패널 렌더링 ──────────────────────────────────────────────────────────
+function renderInputPanel() {
+  document.getElementById('team1Name').value = state.team1.name;
+  document.getElementById('team2Name').value = state.team2.name;
+  document.getElementById('titleInput').value = state.title;
+
+  const t1 = state.team1.players;
+  const t2 = state.team2.players;
+  const maxR = MODE_CONFIG[state.mode].rounds;
+
+  // ── 헤더 행 1: 팀 이름 ──
+  const t1Cols = t1.length * 2; // 각 플레이어당 승+패 2열
+  const t2Cols = t2.length * 2;
+  let hRow1 = `<tr>
+    <th class="th-team1" colspan="${t1Cols}">${state.team1.name}</th>
+    <th class="th-center"></th>
+    <th class="th-team2" colspan="${t2Cols}">${state.team2.name}</th>
+  </tr>`;
+
+  // ── 헤더 행 2: 플레이어 이름 ──
+  let hRow2 = '<tr>';
+  t1.forEach((p, i) => {
+    hRow2 += `<th class="th-pname" colspan="2">
+      <input class="name-inp" placeholder="이름${i+1}" value="${p.name}"
+        onchange="updatePlayerName(1,${i},this.value)">
+    </th>`;
+  });
+  hRow2 += `<th class="th-center">R</th>`;
+  t2.forEach((p, i) => {
+    hRow2 += `<th class="th-pname" colspan="2">
+      <input class="name-inp" placeholder="이름${i+1}" value="${p.name}"
+        onchange="updatePlayerName(2,${i},this.value)">
+    </th>`;
+  });
+  hRow2 += '</tr>';
+
+  // ── 헤더 행 3: 승/패 라벨 ──
+  let hRow3 = '<tr>';
+  t1.forEach(() => {
+    hRow3 += `<th class="th-win">승</th><th class="th-lose">패</th>`;
+  });
+  hRow3 += `<th class="th-center"></th>`;
+  t2.forEach(() => {
+    hRow3 += `<th class="th-win">승</th><th class="th-lose">패</th>`;
+  });
+  hRow3 += '</tr>';
+
+  // ── 데이터 행: 라운드별 체크박스 ──
+  let dataRows = '';
+  for (let r = 1; r <= maxR; r++) {
+    let row = '<tr>';
+    t1.forEach((p, i) => {
+      const c = p.checks.find(x => x.round === r);
+      const wOn = c && c.type === 'win'  ? 'on' : '';
+      const lOn = c && c.type === 'lose' ? 'on' : '';
+      row += `<td><button class="ck w ${wOn}" onclick="toggleCheck(1,${i},${r},'win')">승</button></td>
+              <td><button class="ck l ${lOn}" onclick="toggleCheck(1,${i},${r},'lose')">패</button></td>`;
+    });
+    row += `<td class="td-center">${r}</td>`;
+    t2.forEach((p, i) => {
+      const c = p.checks.find(x => x.round === r);
+      const wOn = c && c.type === 'win'  ? 'on' : '';
+      const lOn = c && c.type === 'lose' ? 'on' : '';
+      row += `<td><button class="ck w ${wOn}" onclick="toggleCheck(2,${i},${r},'win')">승</button></td>
+              <td><button class="ck l ${lOn}" onclick="toggleCheck(2,${i},${r},'lose')">패</button></td>`;
+    });
+    row += '</tr>';
+    dataRows += row;
+  }
+
+  // ── 총합 행 ──
+  let totalRow = '<tr class="total-input-row">';
+  t1.forEach(p => {
+    totalRow += `<td class="td-total score-num w">${p.wins}</td>
+                 <td class="td-total score-num l">${p.losses}</td>`;
+  });
+  totalRow += `<td class="td-center" style="font-size:9px;color:var(--text-sub);">합</td>`;
+  t2.forEach(p => {
+    totalRow += `<td class="td-total score-num w">${p.wins}</td>
+                 <td class="td-total score-num l">${p.losses}</td>`;
+  });
+  totalRow += '</tr>';
+
+  document.getElementById('inputTableWrap').innerHTML = `
+    <div style="overflow-x:auto;">
+      <table class="input-table">
+        <thead>${hRow1}${hRow2}${hRow3}</thead>
+        <tbody>${dataRows}${totalRow}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ── 플레이어 이름 업데이트 ────────────────────────────────────────────────────
+function updatePlayerName(team, idx, value) {
+  const players = team === 1 ? state.team1.players : state.team2.players;
+  players[idx].name = value;
+  // 소환사명 자동 매핑
+  if (PRESET.summoners[value]) players[idx].summoner = PRESET.summoners[value];
+  renderScoreboard();
+}
+
+function updateChamp(team, idx, value) {
+  const players = team === 1 ? state.team1.players : state.team2.players;
+  players[idx].champ = value;
+}
+
+// ── 체크박스 토글 ─────────────────────────────────────────────────────────────
+function toggleCheck(team, idx, round, type) {
+  const players = team === 1 ? state.team1.players : state.team2.players;
+  const player = players[idx];
+
+  const existingIdx = player.checks.findIndex(c => c.round === round);
+  const existing = existingIdx >= 0 ? player.checks[existingIdx] : null;
+
+  if (existing && existing.type === type) {
+    // 같은 버튼 다시 누르면 취소
+    player.checks.splice(existingIdx, 1);
+    recalcScores(player);
+    renderInputPanel();
+    renderScoreboard();
+    return;
+  }
+
+  // 새 체크 or 변경
+  if (existing) player.checks.splice(existingIdx, 1);
+  player.checks.push({ round, type });
+
+  recalcScores(player);
+  renderInputPanel();
+  renderScoreboard();
+
+  // 이펙트 큐에 추가
+  queueEffect(player.name, type, '', player.summoner);
+}
+
+function recalcScores(player) {
+  player.wins   = player.checks.filter(c => c.type === 'win').length;
+  player.losses = player.checks.filter(c => c.type === 'lose').length;
+}
+
+// ── 라운드 변경 ───────────────────────────────────────────────────────────────
+function changeRound(delta) {
+  const max = MODE_CONFIG[state.mode].rounds;
+  state.currentRound = Math.max(1, Math.min(max, state.currentRound + delta));
+  renderInputPanel();
+}
+
+// ── 팀 이름 / 제목 적용 ───────────────────────────────────────────────────────
+function applyTeamNames() {
+  state.team1.name = document.getElementById('team1Name').value || '팀1';
+  state.team2.name = document.getElementById('team2Name').value || '팀2';
+  renderScoreboard();
+}
+
+function applyTitle() {
+  state.title = document.getElementById('titleInput').value || '솔랭내기';
+  renderScoreboard();
+}
+
+// ── 전체 초기화 ───────────────────────────────────────────────────────────────
+function resetAllScores() {
+  if (!confirm('모든 점수를 초기화할까요?')) return;
+  [...state.team1.players, ...state.team2.players].forEach(p => {
+    p.wins = 0; p.losses = 0; p.checks = [];
+  });
+  state.currentRound = 1;
+  renderInputPanel();
+  renderScoreboard();
+}
+
+// ── 스코어보드 렌더링 ─────────────────────────────────────────────────────────
+function renderScoreboard() {
+  const t1 = state.team1;
+  const t2 = state.team2;
+
+  document.getElementById('scoreTitleBar').textContent = state.title;
+
+  const maxRows = Math.max(t1.players.length, t2.players.length);
+  let rows = '';
+  for (let i = 0; i < maxRows; i++) {
+    const lp = t1.players[i];
+    const rp = t2.players[i];
+    rows += `<tr>
+      <td class="p-name-l">${lp ? (lp.name || '—') : ''}</td>
+      <td class="win-n">${lp ? lp.wins : ''}</td>
+      <td class="lose-n divider-col">${lp ? lp.losses : ''}</td>
+      <td class="win-n">${rp ? rp.wins : ''}</td>
+      <td class="lose-n">${rp ? rp.losses : ''}</td>
+      <td class="p-name-r">${rp ? (rp.name || '—') : ''}</td>
+    </tr>`;
+  }
+
+  const t1w = t1.players.reduce((s,p) => s + p.wins, 0);
+  const t1l = t1.players.reduce((s,p) => s + p.losses, 0);
+  const t2w = t2.players.reduce((s,p) => s + p.wins, 0);
+  const t2l = t2.players.reduce((s,p) => s + p.losses, 0);
+
+  rows += `<tr class="total-row">
+    <td class="p-name-l">총합</td>
+    <td class="win-n">${t1w}</td>
+    <td class="lose-n divider-col">${t1l}</td>
+    <td class="win-n">${t2w}</td>
+    <td class="lose-n">${t2l}</td>
+    <td class="p-name-r">총합</td>
+  </tr>`;
+
+  document.getElementById('scoreboardContent').innerHTML = `
+    <table class="sb-table">
+      <thead>
+        <tr>
+          <th class="th-name-l">${t1.name}</th>
+          <th class="th-num w-l">승</th>
+          <th class="th-num l-l">패</th>
+          <th class="th-num w-r">승</th>
+          <th class="th-num l-r">패</th>
+          <th class="th-name-r">${t2.name}</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+// ── 이펙트 큐 ─────────────────────────────────────────────────────────────────
+function queueEffect(playerName, type, champ, summoner) {
+  effectQueue.push({ playerName, type, champ, summoner });
+  if (!isEffectRunning) processQueue();
+}
+
+async function processQueue() {
+  if (effectQueue.length === 0) { isEffectRunning = false; return; }
+  isEffectRunning = true;
+  const item = effectQueue.shift();
+  await runEffect(item);
+  processQueue();
+}
+
+async function runEffect({ playerName, type, champ, summoner }) {
+  const isWin = type === 'win';
+
+  // 1. Drive 이미지 (1초) - URL 직접 방식
+  if (cfg.webappUrl && cfg.webappUrl !== 'YOUR_WEBAPP_URL' && playerName) {
+    try {
+      const res = await fetch(`${cfg.webappUrl}?action=image&player=${encodeURIComponent(playerName)}&t=${Date.now()}`);
+      const imgData = await res.json();
+      if (imgData.imageUrl) {
+        showImage(imgData.imageUrl, isWin);
+        await sleep(1000);
+        hideImage();
+      }
+    } catch(e) { console.warn('이미지 실패:', e); }
+  }
+
+  // 2. Riot API
+  let matchData = null;
+  if (summoner && cfg.riotKey && cfg.riotKey !== 'YOUR_RIOT_API_KEY') {
+    try { matchData = await fetchLastMatch(summoner); } catch(e) { console.warn('Riot API 실패:', e); }
+  }
+  // 챔피언 입력값 우선
+  if (!matchData && champ) matchData = { champion: champ };
+
+  // 3. 결과 이펙트 (2초)
+  showResult(playerName, isWin, matchData);
+  spawnParticles(isWin);
+  await sleep(2000);
+  hideResult();
+}
+
+// ── 이미지 표시 ───────────────────────────────────────────────────────────────
+function showImage(dataUrl, isWin) {
+  const img = document.getElementById('overlayImg');
+  img.src = dataUrl;
+  img.style.boxShadow = `0 0 40px ${isWin ? 'rgba(11,196,227,0.6)' : 'rgba(232,64,87,0.6)'}`;
+  document.getElementById('imgOverlay').classList.add('show');
+}
+function hideImage() { document.getElementById('imgOverlay').classList.remove('show'); }
+
+// ── 결과 오버레이 ─────────────────────────────────────────────────────────────
+function showResult(playerName, isWin, matchData) {
+  const cls = isWin ? 'win' : 'lose';
+  const color = isWin ? 'var(--blue)' : 'var(--red)';
+
+  document.getElementById('resultBg').className = 'result-bg ' + cls;
+  document.getElementById('resultText').className = 'result-text ' + cls;
+  document.getElementById('resultText').textContent = isWin ? '승리' : '패배';
+  document.getElementById('resultDivider').className = 'result-divider ' + cls;
+  document.getElementById('resultPlayer').className = 'result-player ' + cls;
+  document.getElementById('resultPlayer').textContent = playerName || '';
+  ['cornerTL','cornerTR','cornerBL','cornerBR'].forEach(id => {
+    document.getElementById(id).style.borderColor = color;
+  });
+
+  const champEl = document.getElementById('resultChamp');
+  if (matchData && matchData.champion) {
+    champEl.textContent = '✦ ' + matchData.champion + ' ✦';
+    champEl.style.display = 'block';
+  } else { champEl.style.display = 'none'; }
+
+  const statsEl = document.getElementById('resultStats');
+  if (matchData && matchData.kda !== undefined) {
+    const vc = isWin ? 'blue' : 'red';
+    statsEl.innerHTML = `
+      <div class="stat"><div class="stat-label">KDA</div><div class="stat-value ${vc}">${matchData.kda}</div></div>
+      <div class="stat"><div class="stat-label">킬</div><div class="stat-value">${matchData.kills}</div></div>
+      <div class="stat"><div class="stat-label">데스</div><div class="stat-value">${matchData.deaths}</div></div>
+      <div class="stat"><div class="stat-label">어시</div><div class="stat-value">${matchData.assists}</div></div>
+    `;
+  } else { statsEl.innerHTML = ''; }
+
+  document.getElementById('resultOverlay').classList.add('show');
+}
+function hideResult() { document.getElementById('resultOverlay').classList.remove('show'); }
+
+// ── Riot API ──────────────────────────────────────────────────────────────────
+async function fetchLastMatch(summonerRiotId) {
+  const [gameName, tagLine] = summonerRiotId.split('#');
+  if (!gameName || !tagLine) throw new Error('소환사명#태그 형식 필요');
+  const key = cfg.riotKey;
+  const accountRes = await fetch(
+    `https://asia.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+    { headers: { 'X-Riot-Token': key } }
+  );
+  if (!accountRes.ok) throw new Error('소환사 조회 실패');
+  const { puuid } = await accountRes.json();
+
+  const matchListRes = await fetch(
+    `https://asia.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=1`,
+    { headers: { 'X-Riot-Token': key } }
+  );
+  const matchList = await matchListRes.json();
+  if (!matchList.length) throw new Error('매치 없음');
+
+  const matchRes = await fetch(
+    `https://asia.api.riotgames.com/lol/match/v5/matches/${matchList[0]}`,
+    { headers: { 'X-Riot-Token': key } }
+  );
+  const match = await matchRes.json();
+  const p = match.info.participants.find(x => x.puuid === puuid);
+  if (!p) throw new Error('참여자 없음');
+
+  const { kills, deaths, assists, championName } = p;
+  const kda = deaths === 0 ? 'Perfect' : ((kills + assists) / deaths).toFixed(2);
+  return { champion: championName, kills, deaths, assists, kda };
+}
+
+// ── 파티클 ────────────────────────────────────────────────────────────────────
+function spawnParticles(isWin) {
+  const c = document.getElementById('particles');
+  c.innerHTML = '';
+  const colors = isWin
+    ? ['#4fc3f7','#90caf9','#fff','#ffe082','#0bc4e3']
+    : ['#ef9a9a','#ef5350','#fff','#ffcc80','#e84057'];
+  for (let i = 0; i < 55; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const s = Math.random() * 10 + 3;
+    p.style.cssText = `width:${s}px;height:${s}px;left:${Math.random()*100}%;background:${colors[Math.floor(Math.random()*colors.length)]};animation-duration:${Math.random()*2+1.5}s;animation-delay:${Math.random()*0.5}s`;
+    c.appendChild(p);
+  }
+  setTimeout(() => c.innerHTML = '', 3500);
+}
+
+// ── 테스트 ────────────────────────────────────────────────────────────────────
+function testEffect(isWin) {
+  showResult('수야', isWin, { champion: 'Jinx', kills: 12, deaths: 3, assists: 7, kda: '6.33' });
+  spawnParticles(isWin);
+  setTimeout(hideResult, 2000);
+}
+
+// ── 설정 저장 ─────────────────────────────────────────────────────────────────
+function saveCfg() {
+  cfg.webappUrl = document.getElementById('cfgWebappUrl').value.trim();
+  cfg.riotKey   = document.getElementById('cfgRiotKey').value.trim();
+  localStorage.setItem('webappUrl', cfg.webappUrl);
+  localStorage.setItem('riotKey', cfg.riotKey);
+  document.getElementById('cfgSaved').textContent = '✓ 저장됨';
+  setTimeout(() => document.getElementById('cfgSaved').textContent = '', 2000);
+}
+
+// ── 유틸 ─────────────────────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// 초기 스코어보드 렌더
+renderScoreboard();
+</script>
+</body>
+</html>
