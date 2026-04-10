@@ -293,7 +293,7 @@
 
   .result-text {
     font-family: 'Black Han Sans', sans-serif;
-    font-size: clamp(16px, 3vw, 32px); line-height: 1; letter-spacing: 3px;
+    font-size: var(--effect-lg, 20px); line-height: 1; letter-spacing: 3px;
     animation: textPulse 0.7s ease-in-out infinite alternate;
   }
   .result-text.win { color: #fff; text-shadow: 0 0 20px var(--blue), 0 0 50px var(--blue); }
@@ -307,25 +307,47 @@
 
   .result-player {
     font-family: 'Black Han Sans', sans-serif;
-    font-size: clamp(11px, 2vw, 20px); letter-spacing: 2px;
+    font-size: var(--effect-md, 14px); letter-spacing: 2px;
     animation: slideUp 0.4s 0.1s both;
   }
   .result-player.win { color: #90e8f8; text-shadow: 0 0 12px rgba(11,196,227,0.5); }
   .result-player.lose { color: #f8a0aa; text-shadow: 0 0 12px rgba(232,64,87,0.5); }
 
   .result-champ {
-    font-size: clamp(9px, 1.2vw, 13px); font-weight: 900; letter-spacing: 2px;
+    font-size: var(--effect-sm, 10px); font-weight: 900; letter-spacing: 2px;
     margin-top: 1px; color: var(--gold); animation: slideUp 0.4s 0.2s both;
   }
   .result-stats {
-    display: flex; gap: clamp(6px, 1.5vw, 16px); justify-content: center; margin-top: 4px;
+    display: flex; gap: 8px; justify-content: center; margin-top: 3px;
     animation: slideUp 0.4s 0.3s both;
   }
   .stat { text-align: center; }
-  .stat-label { font-size: clamp(6px, 0.8vw, 8px); letter-spacing: 1px; color: var(--text-sub); margin-bottom: 1px; text-transform: uppercase; }
-  .stat-value { font-family: 'Black Han Sans', sans-serif; font-size: clamp(10px, 2vw, 16px); color: var(--gold-light); }
+  .stat-label { font-size: var(--effect-xs, 7px); letter-spacing: 1px; color: var(--text-sub); margin-bottom: 1px; text-transform: uppercase; }
+  .stat-value { font-family: 'Black Han Sans', sans-serif; font-size: var(--effect-sm, 10px); color: var(--gold-light); }
   .stat-value.blue { color: var(--blue); }
   .stat-value.red { color: var(--red); }
+
+  /* 타이머 */
+  .timer-bar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 3px 8px;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.2);
+    font-family: 'Black Han Sans', sans-serif;
+  }
+  .timer-label { font-size: 9px; letter-spacing: 2px; color: var(--text-sub); }
+  .timer-value { font-size: 13px; color: var(--gold); letter-spacing: 2px; }
+  .timer-value.urgent { color: var(--red); animation: textPulse 0.5s ease-in-out infinite alternate; }
+
+  /* 연승 배지 */
+  .streak-badge {
+    display: inline-block; font-size: 9px; font-weight: 900;
+    padding: 1px 4px; border-radius: 2px; margin-left: 3px;
+    font-family: 'Black Han Sans', sans-serif; letter-spacing: 0;
+    vertical-align: middle;
+  }
+  .streak-badge.win { background: rgba(11,196,227,0.2); color: var(--blue); border: 1px solid rgba(11,196,227,0.4); }
+  .streak-badge.lose { background: rgba(232,64,87,0.2); color: var(--red); border: 1px solid rgba(232,64,87,0.4); }
 
   @keyframes slideUp { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
@@ -391,6 +413,10 @@
       <button class="btn" onclick="testEffect(true)">🔵 승리 테스트</button>
       <button class="btn" onclick="testEffect(false)">🔴 패배 테스트</button>
     </div>
+    <div class="timer-bar" id="timerBar" style="display:none;">
+      <span class="timer-label">마지막 큐</span>
+      <span class="timer-value" id="timerValue">--:--:--</span>
+    </div>
   </div>
 
   <!-- 입력 탭 -->
@@ -420,6 +446,14 @@
         <div class="ctrl-group">
           <span class="ctrl-label" style="color:var(--red);">팀2</span>
           <input type="text" id="team2Name" class="team-input" placeholder="팀2 이름" oninput="applyTeamNames()">
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">마감</span>
+          <select id="timerMode" onchange="onTimerModeChange()" style="background:rgba(0,0,0,0.4);border:1px solid var(--border);color:var(--gold);font-size:10px;padding:4px 6px;border-radius:2px;outline:none;">
+            <option value="none">없음</option>
+            <option value="time">시간</option>
+          </select>
+          <input type="datetime-local" id="timerTarget" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border);color:#fff;font-size:10px;padding:4px 6px;border-radius:2px;outline:none;" onchange="onTimerTargetChange()">
         </div>
       </div>
 
@@ -552,7 +586,94 @@ let cfg = {
 const effectQueue = [];
 let isEffectRunning = false;
 
-// ── Firebase 동기화 ───────────────────────────────────────────────────────────
+// ── 타이머 ────────────────────────────────────────────────────────────────────
+let timerInterval = null;
+let timerTarget = null;
+
+function onTimerModeChange() {
+  const mode = document.getElementById('timerMode').value;
+  const targetInput = document.getElementById('timerTarget');
+  const timerBar = document.getElementById('timerBar');
+  if (mode === 'time') {
+    targetInput.style.display = 'block';
+    timerBar.style.display = 'flex';
+  } else {
+    targetInput.style.display = 'none';
+    timerBar.style.display = 'none';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    timerTarget = null;
+  }
+}
+
+function onTimerTargetChange() {
+  const val = document.getElementById('timerTarget').value;
+  if (!val) return;
+  timerTarget = new Date(val);
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimer, 1000);
+  updateTimer();
+}
+
+function updateTimer() {
+  if (!timerTarget) return;
+  const now = new Date();
+  const diff = timerTarget - now;
+  const el = document.getElementById('timerValue');
+
+  if (diff <= 0) {
+    el.textContent = '00시간:00분:00초';
+    el.className = 'timer-value urgent';
+    return;
+  }
+
+  const totalSec = Math.floor(diff / 1000);
+  const days  = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins  = Math.floor((totalSec % 3600) / 60);
+  const secs  = totalSec % 60;
+
+  const pad = n => String(n).padStart(2, '0');
+  const text = days > 0
+    ? `${days}일 ${pad(hours)}시간:${pad(mins)}분:${pad(secs)}초`
+    : `${pad(hours)}시간:${pad(mins)}분:${pad(secs)}초`;
+
+  el.textContent = text;
+  el.className = diff < 3600000 ? 'timer-value urgent' : 'timer-value';
+}
+
+// ── 연승 계산 ─────────────────────────────────────────────────────────────────
+function getStreak(player) {
+  const checks = [...(player.checks || [])].sort((a,b) => a.round - b.round);
+  if (!checks.length) return null;
+  const lastType = checks[checks.length - 1].type;
+  let count = 0;
+  for (let i = checks.length - 1; i >= 0; i--) {
+    if (checks[i].type === lastType) count++;
+    else break;
+  }
+  return count >= 2 ? { type: lastType, count } : null;
+}
+
+// ── 이펙트 폰트 크기 동적 계산 ───────────────────────────────────────────────
+function updateEffectFontSize() {
+  const wrap = document.getElementById('scoreboardWrap');
+  if (!wrap) return;
+  const h = wrap.getBoundingClientRect().height;
+  // 표 높이 기준으로 비례 계산
+  const lg = Math.max(12, Math.min(32, h * 0.22));
+  const md = Math.max(9,  Math.min(20, h * 0.14));
+  const sm = Math.max(7,  Math.min(13, h * 0.09));
+  const xs = Math.max(6,  Math.min(9,  h * 0.07));
+  const overlay = document.getElementById('resultOverlay');
+  if (overlay) {
+    overlay.style.setProperty('--effect-lg', lg + 'px');
+    overlay.style.setProperty('--effect-md', md + 'px');
+    overlay.style.setProperty('--effect-sm', sm + 'px');
+    overlay.style.setProperty('--effect-xs', xs + 'px');
+  }
+}
+
+// ── 타이머 모드 설정 ──────────────────────────────────────────────────────────
 let isSyncing = false; // 원격 업데이트 수신 중 로컬 저장 방지
 
 function saveToFirebase() {
@@ -652,6 +773,11 @@ window.onload = () => {
   } else {
     window.addEventListener('firebase-ready', listenFirebase, { once: true });
   }
+
+  // 마감 시간 기본값 = 현재 시간 (수정 가능)
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('timerTarget').value = now.toISOString().slice(0, 16);
 };
 
 // ── 탭 ────────────────────────────────────────────────────────────────────────
@@ -875,13 +1001,17 @@ function renderScoreboard() {
   for (let i = 0; i < maxRows; i++) {
     const lp = t1.players[i];
     const rp = t2.players[i];
+    const ls = lp ? getStreak(lp) : null;
+    const rs = rp ? getStreak(rp) : null;
+    const lStreak = ls ? `<span class="streak-badge ${ls.type}">${ls.count}${ls.type === 'win' ? '연승🔥' : '연패💀'}</span>` : '';
+    const rStreak = rs ? `<span class="streak-badge ${rs.type}">${rs.count}${rs.type === 'win' ? '연승🔥' : '연패💀'}</span>` : '';
     rows += `<tr>
-      <td class="p-name-l">${lp ? (lp.name || '—') : ''}</td>
+      <td class="p-name-l">${lp ? (lp.name || '—') : ''}${lStreak}</td>
       <td class="win-n">${lp ? lp.wins : ''}</td>
       <td class="lose-n divider-col">${lp ? lp.losses : ''}</td>
       <td class="win-n">${rp ? rp.wins : ''}</td>
       <td class="lose-n">${rp ? rp.losses : ''}</td>
-      <td class="p-name-r">${rp ? (rp.name || '—') : ''}</td>
+      <td class="p-name-r">${rStreak}${rp ? (rp.name || '—') : ''}</td>
     </tr>`;
   }
 
@@ -975,6 +1105,7 @@ function hideImage() { document.getElementById('imgOverlay').classList.remove('s
 
 // ── 결과 오버레이 ─────────────────────────────────────────────────────────────
 function showResult(playerName, isWin, matchData) {
+  updateEffectFontSize(); // 표 크기에 맞게 폰트 크기 계산
   const cls = isWin ? 'win' : 'lose';
   const color = isWin ? 'var(--blue)' : 'var(--red)';
 
