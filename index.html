@@ -285,44 +285,45 @@
   .result-bg.lose { background: radial-gradient(ellipse at center, rgba(232,64,87,0.25) 0%, rgba(1,10,19,0.92) 70%); }
 
   .result-content {
-    position: relative; z-index: 2; text-align: center; padding: 8px;
+    position: relative; z-index: 2; text-align: center; padding: 4px 8px;
     animation: resultPop 0.35s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
+    width: 100%;
   }
   @keyframes resultPop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
   .result-text {
     font-family: 'Black Han Sans', sans-serif;
-    font-size: clamp(24px, 5vw, 52px); line-height: 1; letter-spacing: 4px;
+    font-size: clamp(16px, 3vw, 32px); line-height: 1; letter-spacing: 3px;
     animation: textPulse 0.7s ease-in-out infinite alternate;
   }
   .result-text.win { color: #fff; text-shadow: 0 0 20px var(--blue), 0 0 50px var(--blue); }
   .result-text.lose { color: #fff; text-shadow: 0 0 20px var(--red), 0 0 50px var(--red); }
   @keyframes textPulse { from { transform: scale(1); } to { transform: scale(1.04); filter: brightness(1.3); } }
 
-  .result-divider { height: 1px; margin: 5px auto; width: 0; animation: divExpand 0.4s 0.15s forwards; }
+  .result-divider { height: 1px; margin: 3px auto; width: 0; animation: divExpand 0.4s 0.15s forwards; }
   .result-divider.win { background: linear-gradient(90deg, transparent, var(--blue), #fff, var(--blue), transparent); box-shadow: 0 0 8px var(--blue); }
   .result-divider.lose { background: linear-gradient(90deg, transparent, var(--red), #fff, var(--red), transparent); box-shadow: 0 0 8px var(--red); }
   @keyframes divExpand { to { width: 80%; } }
 
   .result-player {
     font-family: 'Black Han Sans', sans-serif;
-    font-size: clamp(14px, 2.5vw, 28px); letter-spacing: 3px;
+    font-size: clamp(11px, 2vw, 20px); letter-spacing: 2px;
     animation: slideUp 0.4s 0.1s both;
   }
   .result-player.win { color: #90e8f8; text-shadow: 0 0 12px rgba(11,196,227,0.5); }
   .result-player.lose { color: #f8a0aa; text-shadow: 0 0 12px rgba(232,64,87,0.5); }
 
   .result-champ {
-    font-size: clamp(10px, 1.5vw, 15px); font-weight: 900; letter-spacing: 3px;
-    margin-top: 2px; color: var(--gold); animation: slideUp 0.4s 0.2s both;
+    font-size: clamp(9px, 1.2vw, 13px); font-weight: 900; letter-spacing: 2px;
+    margin-top: 1px; color: var(--gold); animation: slideUp 0.4s 0.2s both;
   }
   .result-stats {
-    display: flex; gap: clamp(8px, 2vw, 20px); justify-content: center; margin-top: 6px;
+    display: flex; gap: clamp(6px, 1.5vw, 16px); justify-content: center; margin-top: 4px;
     animation: slideUp 0.4s 0.3s both;
   }
   .stat { text-align: center; }
-  .stat-label { font-size: clamp(7px, 1vw, 9px); letter-spacing: 2px; color: var(--text-sub); margin-bottom: 1px; text-transform: uppercase; }
-  .stat-value { font-family: 'Black Han Sans', sans-serif; font-size: clamp(12px, 2.5vw, 20px); color: var(--gold-light); }
+  .stat-label { font-size: clamp(6px, 0.8vw, 8px); letter-spacing: 1px; color: var(--text-sub); margin-bottom: 1px; text-transform: uppercase; }
+  .stat-value { font-family: 'Black Han Sans', sans-serif; font-size: clamp(10px, 2vw, 16px); color: var(--gold-light); }
   .stat-value.blue { color: var(--blue); }
   .stat-value.red { color: var(--red); }
 
@@ -459,6 +460,33 @@
 
 </div><!-- /app -->
 
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBbSW87CZPc5pmzIHU8UduhOR6oT3S4yW8",
+  authDomain: "solorank-b18cc.firebaseapp.com",
+  databaseURL: "https://solorank-b18cc-default-rtdb.firebaseio.com",
+  projectId: "solorank-b18cc",
+  storageBucket: "solorank-b18cc.firebasestorage.app",
+  messagingSenderId: "197083254250",
+  appId: "1:197083254250:web:a981e88759c5be0125b693"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// 전역으로 노출
+window._fbDb = db;
+window._fbRef = ref;
+window._fbSet = set;
+window._fbOnValue = onValue;
+window._fbReady = true;
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
 <script>
 // ================================================================
 // ★ 매니저 설정란 - 여기만 수정하면 됩니다 ★
@@ -524,19 +552,106 @@ let cfg = {
 const effectQueue = [];
 let isEffectRunning = false;
 
+// ── Firebase 동기화 ───────────────────────────────────────────────────────────
+let isSyncing = false; // 원격 업데이트 수신 중 로컬 저장 방지
+
+function saveToFirebase() {
+  if (!window._fbReady) return;
+  const data = {
+    mode:  state.mode,
+    title: state.title,
+    team1: {
+      name: state.team1.name,
+      players: state.team1.players.map(p => ({
+        name: p.name, wins: p.wins, losses: p.losses,
+        checks: p.checks,
+      })),
+    },
+    team2: {
+      name: state.team2.name,
+      players: state.team2.players.map(p => ({
+        name: p.name, wins: p.wins, losses: p.losses,
+        checks: p.checks,
+      })),
+    },
+  };
+  window._fbSet(window._fbRef(window._fbDb, 'game'), data);
+}
+
+function listenFirebase() {
+  if (!window._fbReady) return;
+  window._fbOnValue(window._fbRef(window._fbDb, 'game'), (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+    isSyncing = true;
+
+    // 이전 체크와 비교해서 새로 체크된 항목 감지 → 이펙트 발동
+    const prevChecks = getAllChecks();
+
+    state.mode  = data.mode  || '3vs3';
+    state.title = data.title || '[N판/N판] 솔랭내기';
+
+    const perTeam = MODE_CONFIG[state.mode].perTeam;
+    state.team1.name = data.team1?.name || '팀1';
+    state.team2.name = data.team2?.name || '팀2';
+
+    state.team1.players = (data.team1?.players || []).slice(0, perTeam).map(p => ({
+      name: p.name || '', summoner: cfg.summoners[p.name] || PRESET.summoners[p.name] || '',
+      wins: p.wins || 0, losses: p.losses || 0, checks: p.checks || [],
+    }));
+    state.team2.players = (data.team2?.players || []).slice(0, perTeam).map(p => ({
+      name: p.name || '', summoner: cfg.summoners[p.name] || PRESET.summoners[p.name] || '',
+      wins: p.wins || 0, losses: p.losses || 0, checks: p.checks || [],
+    }));
+
+    // 플레이어 수 맞추기
+    while (state.team1.players.length < perTeam)
+      state.team1.players.push({ name: '', summoner: '', wins: 0, losses: 0, checks: [] });
+    while (state.team2.players.length < perTeam)
+      state.team2.players.push({ name: '', summoner: '', wins: 0, losses: 0, checks: [] });
+
+    // 새로 체크된 항목 감지
+    const newChecks = getAllChecks();
+    newChecks.forEach(c => {
+      const key = `${c.playerName}_${c.round}_${c.type}`;
+      if (!prevChecks.find(p => `${p.playerName}_${p.round}_${p.type}` === key)) {
+        queueEffect(c.playerName, c.type, '', c.summoner);
+      }
+    });
+
+    renderScoreboard();
+    renderInputPanel();
+    document.getElementById('scoreTitleBar').textContent = state.title;
+
+    isSyncing = false;
+  });
+}
+
+function getAllChecks() {
+  const result = [];
+  [...state.team1.players, ...state.team2.players].forEach(p => {
+    (p.checks || []).forEach(c => {
+      result.push({ playerName: p.name, summoner: p.summoner, round: c.round, type: c.type });
+    });
+  });
+  return result;
+}
+
 // ── 초기화 ────────────────────────────────────────────────────────────────────
 window.onload = () => {
-  // 설정 탭 입력값
   document.getElementById('cfgWebappUrl').value = cfg.webappUrl;
   document.getElementById('cfgRiotKey').value   = cfg.riotKey;
-
-  // 입력 탭은 setMode가 renderInputPanel 호출하므로 한번에 처리
   setMode('3vs3');
-
-  // 초기 팀명 입력란 값 설정
-  document.getElementById('team1Name').value = state.team1.name;
-  document.getElementById('team2Name').value = state.team2.name;
+  document.getElementById('team1Name').value  = state.team1.name;
+  document.getElementById('team2Name').value  = state.team2.name;
   document.getElementById('titleInput').value = state.title;
+
+  // Firebase 준비되면 리스너 연결
+  if (window._fbReady) {
+    listenFirebase();
+  } else {
+    window.addEventListener('firebase-ready', listenFirebase, { once: true });
+  }
 };
 
 // ── 탭 ────────────────────────────────────────────────────────────────────────
@@ -671,9 +786,9 @@ function renderInputPanel() {
 function updatePlayerName(team, idx, value) {
   const players = team === 1 ? state.team1.players : state.team2.players;
   players[idx].name = value;
-  // 소환사명 자동 매핑 (cfg.summoners 우선, PRESET 차선)
   players[idx].summoner = cfg.summoners[value] || PRESET.summoners[value] || '';
   renderScoreboard();
+  saveToFirebase();
 }
 
 function updateChamp(team, idx, value) {
@@ -690,11 +805,11 @@ function toggleCheck(team, idx, round, type) {
   const existing = existingIdx >= 0 ? player.checks[existingIdx] : null;
 
   if (existing && existing.type === type) {
-    // 같은 버튼 다시 누르면 취소
     player.checks.splice(existingIdx, 1);
     recalcScores(player);
     renderInputPanel();
     renderScoreboard();
+    saveToFirebase();
     return;
   }
 
@@ -705,6 +820,7 @@ function toggleCheck(team, idx, round, type) {
   recalcScores(player);
   renderInputPanel();
   renderScoreboard();
+  saveToFirebase();
 
   // 이펙트 큐에 추가
   queueEffect(player.name, type, '', player.summoner);
@@ -727,11 +843,13 @@ function applyTeamNames() {
   state.team1.name = document.getElementById('team1Name').value || '팀1';
   state.team2.name = document.getElementById('team2Name').value || '팀2';
   renderScoreboard();
+  saveToFirebase();
 }
 
 function applyTitle() {
   state.title = document.getElementById('titleInput').value || '솔랭내기';
-  renderScoreboard();
+  document.getElementById('scoreTitleBar').textContent = state.title;
+  saveToFirebase();
 }
 
 // ── 전체 초기화 ───────────────────────────────────────────────────────────────
@@ -822,7 +940,7 @@ async function runEffect({ playerName, type, champ, summoner }) {
       const imgData = await res.json();
       if (imgData.imageUrl) {
         await showImage(imgData.imageUrl, isWin); // 로드 완료까지 대기
-        await sleep(2000);
+        await sleep(1000);
         hideImage();
       }
     } catch(e) { console.warn('이미지 실패:', e); }
@@ -847,20 +965,8 @@ function showImage(url, isWin) {
   return new Promise((resolve) => {
     const img = document.getElementById('overlayImg');
     const overlay = document.getElementById('imgOverlay');
-
-    // 크기를 scoreboard-wrap에 맞게 설정
-    const wrap = document.getElementById('scoreboardWrap');
-    if (wrap) {
-      const rect = wrap.getBoundingClientRect();
-      overlay.style.width  = rect.width  + 'px';
-      overlay.style.height = rect.height + 'px';
-    }
-
-    img.onload = () => {
-      overlay.classList.add('show');
-      resolve();
-    };
-    img.onerror = () => resolve(); // 실패해도 진행
+    img.onload = () => { overlay.classList.add('show'); resolve(); };
+    img.onerror = () => resolve();
     img.src = url;
     img.style.boxShadow = `0 0 40px ${isWin ? 'rgba(11,196,227,0.6)' : 'rgba(232,64,87,0.6)'}`;
   });
@@ -871,15 +977,6 @@ function hideImage() { document.getElementById('imgOverlay').classList.remove('s
 function showResult(playerName, isWin, matchData) {
   const cls = isWin ? 'win' : 'lose';
   const color = isWin ? 'var(--blue)' : 'var(--red)';
-
-  // 오버레이 크기를 표에 맞게 동적 설정
-  const wrap = document.getElementById('scoreboardWrap');
-  const overlay = document.getElementById('resultOverlay');
-  if (wrap) {
-    const rect = wrap.getBoundingClientRect();
-    overlay.style.width  = rect.width  + 'px';
-    overlay.style.height = rect.height + 'px';
-  }
 
   document.getElementById('resultBg').className = 'result-bg ' + cls;
   document.getElementById('resultText').className = 'result-text ' + cls;
