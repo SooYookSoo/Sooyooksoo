@@ -327,13 +327,16 @@
   .stat-value.blue { color: var(--blue); }
   .stat-value.red { color: var(--red); }
 
-  /* 타이머 */
+  /* 타이머 - 표 바로 아래 붙음 */
   .timer-bar {
     display: flex; align-items: center; justify-content: center;
     gap: 6px; padding: 3px 8px;
-    border-top: 1px solid var(--border);
-    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    background: rgba(0,0,0,0.3);
     font-family: 'Black Han Sans', sans-serif;
+    width: 100%;
   }
   .timer-label { font-size: 9px; letter-spacing: 2px; color: var(--text-sub); }
   .timer-value { font-size: 13px; color: var(--gold); letter-spacing: 2px; }
@@ -413,10 +416,6 @@
       <button class="btn" onclick="testEffect(true)">🔵 승리 테스트</button>
       <button class="btn" onclick="testEffect(false)">🔴 패배 테스트</button>
     </div>
-    <div class="timer-bar" id="timerBar" style="display:none;">
-      <span class="timer-label">마지막 큐</span>
-      <span class="timer-value" id="timerValue">--:--:--</span>
-    </div>
   </div>
 
   <!-- 입력 탭 -->
@@ -453,7 +452,8 @@
             <option value="none">없음</option>
             <option value="time">시간</option>
           </select>
-          <input type="datetime-local" id="timerTarget" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border);color:#fff;font-size:10px;padding:4px 6px;border-radius:2px;outline:none;" onchange="onTimerTargetChange()">
+          <input type="date" id="timerDate" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border);color:#fff;font-size:10px;padding:4px 6px;border-radius:2px;outline:none;" onchange="onTimerTargetChange()">
+          <input type="time" id="timerTime" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border);color:#fff;font-size:10px;padding:4px 6px;border-radius:2px;outline:none;" onchange="onTimerTargetChange()">
         </div>
       </div>
 
@@ -592,23 +592,25 @@ let timerTarget = null;
 
 function onTimerModeChange() {
   const mode = document.getElementById('timerMode').value;
-  const targetInput = document.getElementById('timerTarget');
-  const timerBar = document.getElementById('timerBar');
+  const dateInput = document.getElementById('timerDate');
+  const timeInput = document.getElementById('timerTime');
   if (mode === 'time') {
-    targetInput.style.display = 'block';
-    timerBar.style.display = 'flex';
+    dateInput.style.display = 'block';
+    timeInput.style.display = 'block';
   } else {
-    targetInput.style.display = 'none';
-    timerBar.style.display = 'none';
+    dateInput.style.display = 'none';
+    timeInput.style.display = 'none';
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     timerTarget = null;
   }
+  renderScoreboard();
 }
 
 function onTimerTargetChange() {
-  const val = document.getElementById('timerTarget').value;
-  if (!val) return;
-  timerTarget = new Date(val);
+  const dateVal = document.getElementById('timerDate').value;
+  const timeVal = document.getElementById('timerTime').value;
+  if (!dateVal || !timeVal) return;
+  timerTarget = new Date(`${dateVal}T${timeVal}`);
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(updateTimer, 1000);
   updateTimer();
@@ -776,8 +778,11 @@ window.onload = () => {
 
   // 마감 시간 기본값 = 현재 시간 (수정 가능)
   const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('timerTarget').value = now.toISOString().slice(0, 16);
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('timerDate').value =
+    `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  document.getElementById('timerTime').value =
+    `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 };
 
 // ── 탭 ────────────────────────────────────────────────────────────────────────
@@ -1029,6 +1034,13 @@ function renderScoreboard() {
     <td class="p-name-r">총합</td>
   </tr>`;
 
+  const timerVisible = document.getElementById('timerMode')?.value === 'time';
+  const timerHtml = timerVisible ? `
+    <div class="timer-bar" id="timerBar">
+      <span class="timer-label">마지막 큐</span>
+      <span class="timer-value" id="timerValue">--:--:--</span>
+    </div>` : `<div id="timerBar" style="display:none;"><span id="timerValue"></span></div>`;
+
   document.getElementById('scoreboardContent').innerHTML = `
     <table class="sb-table">
       <thead>
@@ -1042,7 +1054,7 @@ function renderScoreboard() {
         </tr>
       </thead>
       <tbody>${rows}</tbody>
-    </table>
+    </table>${timerHtml}
   `;
 }
 
