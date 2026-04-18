@@ -484,10 +484,17 @@
         <button class="btn blue" onclick="saveCfg()" style="margin-top:6px;">저장</button>
       </div>
       <div class="config-box">
-        <h3>▸ 소환사명 저장소 (이름 → 소환사명#태그)</h3>
+        <h3>▸ 소환사명 저장소</h3>
+        <div style="display:flex;gap:4px;margin-bottom:4px;">
+          <span style="flex:1.2;font-size:9px;letter-spacing:1px;color:var(--text-sub);text-align:center;">이름 (or로 여러개)</span>
+          <span style="flex:1.5;font-size:9px;letter-spacing:1px;color:var(--text-sub);text-align:center;">소환사명#태그</span>
+          <span style="flex:1;font-size:9px;letter-spacing:1px;color:var(--text-sub);text-align:center;">드라이브 폴더명</span>
+          <span style="width:28px;"></span>
+        </div>
         <div style="display:flex;gap:6px;margin-bottom:8px;">
-          <input type="text" id="newSummonerName" placeholder="이름 (예: 수야)" style="flex:1;">
-          <input type="text" id="newSummonerRiot" placeholder="소환사명#태그 (예: 수야#KR1)" style="flex:2;">
+          <input type="text" id="newSummonerName" placeholder="예: 경호 or 스맵" style="flex:1.2;">
+          <input type="text" id="newSummonerRiot" placeholder="예: 경호#KR1" style="flex:1.5;">
+          <input type="text" id="newSummonerFolder" placeholder="비우면 이름과 동일" style="flex:1;">
           <button class="btn blue" onclick="addSummoner()">추가</button>
         </div>
         <div id="summonerInputs" style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;"></div>
@@ -921,7 +928,7 @@ function renderInputPanel() {
 function updatePlayerName(team, idx, value) {
   const players = team === 1 ? state.team1.players : state.team2.players;
   players[idx].name = value;
-  players[idx].summoner = cfg.summoners[value] || PRESET.summoners[value] || '';
+  players[idx].summoner = getSummoner(value);
   renderScoreboard();
   saveToFirebase();
 }
@@ -1082,10 +1089,11 @@ async function runEffect({ playerName, type, champ, summoner }) {
   // 1. Drive 이미지 - 완전히 로드된 후 표시 (1초)
   if (cfg.webappUrl && cfg.webappUrl !== 'YOUR_WEBAPP_URL' && playerName) {
     try {
-      const res = await fetch(`${cfg.webappUrl}?action=image&player=${encodeURIComponent(playerName)}&t=${Date.now()}`);
+      const folderName = getDriveFolder(playerName);
+      const res = await fetch(`${cfg.webappUrl}?action=image&player=${encodeURIComponent(folderName)}&t=${Date.now()}`);
       const imgData = await res.json();
       if (imgData.imageUrl) {
-        await showImage(imgData.imageUrl, isWin); // 로드 완료까지 대기
+        await showImage(imgData.imageUrl, isWin);
         await sleep(1000);
         hideImage();
       }
@@ -1233,28 +1241,37 @@ function renderSummonerInputs() {
     return;
   }
 
-  el.innerHTML = entries.map(([name, riot]) => `
-    <div style="display:flex;align-items:center;gap:6px;">
-      <input type="text" value="${name}" id="sn_${name}"
-        style="width:70px;font-family:'Black Han Sans',sans-serif;font-size:12px;color:var(--gold-light);"
-        onchange="renameSummoner('${name}', this.value)">
-      <input type="text" value="${riot}" id="sr_${name}"
-        placeholder="소환사명#태그" style="flex:1;"
-        onchange="updateSummonerRiot('${name}', this.value)">
-      <button class="btn" onclick="deleteSummoner('${name}')"
-        style="border-color:var(--red);color:var(--red);padding:2px 6px;">✕</button>
-    </div>
-  `).join('');
+  el.innerHTML = entries.map(([name, val]) => {
+    const riot   = typeof val === 'object' ? (val.riot   || '') : val;
+    const folder = typeof val === 'object' ? (val.folder || '') : '';
+    return `
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input type="text" value="${name}" id="sn_${name}"
+          style="flex:1.2;font-family:'Black Han Sans',sans-serif;font-size:12px;color:var(--gold-light);"
+          onchange="renameSummoner('${name}', this.value)">
+        <input type="text" value="${riot}" id="sr_${name}"
+          placeholder="소환사명#태그" style="flex:1.5;"
+          onchange="updateSummonerField('${name}', 'riot', this.value)">
+        <input type="text" value="${folder}" id="sf_${name}"
+          placeholder="폴더명 (기본=이름)" style="flex:1;"
+          onchange="updateSummonerField('${name}', 'folder', this.value)">
+        <button class="btn" onclick="deleteSummoner('${name}')"
+          style="border-color:var(--red);color:var(--red);padding:2px 6px;width:28px;">✕</button>
+      </div>
+    `;
+  }).join('');
 }
 
 function addSummoner() {
-  const name = document.getElementById('newSummonerName').value.trim();
-  const riot = document.getElementById('newSummonerRiot').value.trim();
+  const name   = document.getElementById('newSummonerName').value.trim();
+  const riot   = document.getElementById('newSummonerRiot').value.trim();
+  const folder = document.getElementById('newSummonerFolder').value.trim();
   if (!name || !riot) return;
-  cfg.summoners[name] = riot;
+  cfg.summoners[name] = { riot, folder };
   saveSummonersToStorage();
-  document.getElementById('newSummonerName').value = '';
-  document.getElementById('newSummonerRiot').value = '';
+  document.getElementById('newSummonerName').value   = '';
+  document.getElementById('newSummonerRiot').value   = '';
+  document.getElementById('newSummonerFolder').value = '';
   renderSummonerInputs();
   showSummonerSaved();
 }
@@ -1268,12 +1285,15 @@ function renameSummoner(oldName, newName) {
   renderSummonerInputs();
 }
 
-function updateSummonerRiot(name, riot) {
-  cfg.summoners[name] = riot.trim();
+function updateSummonerField(name, field, value) {
+  if (typeof cfg.summoners[name] !== 'object') {
+    cfg.summoners[name] = { riot: cfg.summoners[name], folder: '' };
+  }
+  cfg.summoners[name][field] = value.trim();
   // 현재 게임 플레이어에도 반영
   [...state.team1.players, ...state.team2.players]
-    .filter(p => p.name === name)
-    .forEach(p => p.summoner = cfg.summoners[name]);
+    .filter(p => getSummonerKey(p.name) === name)
+    .forEach(p => p.summoner = cfg.summoners[name].riot || '');
   saveSummonersToStorage();
   showSummonerSaved();
 }
@@ -1295,6 +1315,40 @@ function showSummonerSaved() {
   if (!el) return;
   el.textContent = '✓ 저장됨';
   setTimeout(() => el.textContent = '', 2000);
+}
+
+// 이름(or 포함)으로 저장소 키 찾기
+function getSummonerKey(playerName) {
+  if (!playerName) return null;
+  const name = playerName.trim();
+  // 정확히 일치하는 키
+  if (cfg.summoners[name]) return name;
+  // or로 연결된 키에서 찾기
+  for (const key of Object.keys(cfg.summoners)) {
+    const aliases = key.split(/\s*or\s*/i).map(s => s.trim());
+    if (aliases.includes(name)) return key;
+  }
+  // PRESET에서도 찾기
+  if (PRESET.summoners[name]) return name;
+  return null;
+}
+
+// 소환사명 가져오기
+function getSummoner(playerName) {
+  const key = getSummonerKey(playerName);
+  if (!key) return '';
+  const val = cfg.summoners[key] || PRESET.summoners[key];
+  return typeof val === 'object' ? (val.riot || '') : (val || '');
+}
+
+// Drive 폴더명 가져오기 (없으면 첫 번째 이름 사용)
+function getDriveFolder(playerName) {
+  const key = getSummonerKey(playerName);
+  if (!key) return playerName;
+  const val = cfg.summoners[key];
+  if (typeof val === 'object' && val.folder) return val.folder;
+  // 폴더명 없으면 key의 첫 번째 이름 사용
+  return key.split(/\s*or\s*/i)[0].trim();
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────────────────────
