@@ -484,9 +484,13 @@
         <button class="btn blue" onclick="saveCfg()" style="margin-top:6px;">저장</button>
       </div>
       <div class="config-box">
-        <h3>▸ 소환사명 설정 (플레이어 이름 → 소환사명#태그)</h3>
-        <div id="summonerInputs" style="display:flex;flex-direction:column;gap:5px;"></div>
-        <button class="btn blue" onclick="saveSummoners()" style="margin-top:8px;">저장</button>
+        <h3>▸ 소환사명 저장소 (이름 → 소환사명#태그)</h3>
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <input type="text" id="newSummonerName" placeholder="이름 (예: 수야)" style="flex:1;">
+          <input type="text" id="newSummonerRiot" placeholder="소환사명#태그 (예: 수야#KR1)" style="flex:2;">
+          <button class="btn blue" onclick="addSummoner()">추가</button>
+        </div>
+        <div id="summonerInputs" style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;"></div>
         <div class="success-msg" id="summonerSaved"></div>
       </div>
     </div>
@@ -1218,51 +1222,79 @@ function saveCfg() {
   setTimeout(() => document.getElementById('cfgSaved').textContent = '', 2000);
 }
 
-// ── 소환사명 입력 UI 렌더링 ───────────────────────────────────────────────────
+// ── 소환사명 저장소 관리 ──────────────────────────────────────────────────────
 function renderSummonerInputs() {
-  const allPlayers = [
-    ...state.team1.players,
-    ...state.team2.players,
-  ].filter(p => p.name);
-
-  // 이름 없는 경우 PRESET 키로 보완
-  const names = allPlayers.length > 0
-    ? [...new Set(allPlayers.map(p => p.name))]
-    : Object.keys(PRESET.summoners);
-
   const el = document.getElementById('summonerInputs');
   if (!el) return;
-  el.innerHTML = names.map(name => `
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-family:'Black Han Sans',sans-serif;font-size:13px;color:var(--gold);min-width:50px;">${name}</span>
-      <input type="text" id="si_${name}" value="${cfg.summoners[name] || PRESET.summoners[name] || ''}"
-        placeholder="${name}#KR1" style="flex:1;">
+
+  const entries = Object.entries(cfg.summoners).sort((a,b) => a[0].localeCompare(b[0], 'ko'));
+  if (entries.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text-sub);">저장된 소환사명 없음</div>';
+    return;
+  }
+
+  el.innerHTML = entries.map(([name, riot]) => `
+    <div style="display:flex;align-items:center;gap:6px;">
+      <input type="text" value="${name}" id="sn_${name}"
+        style="width:70px;font-family:'Black Han Sans',sans-serif;font-size:12px;color:var(--gold-light);"
+        onchange="renameSummoner('${name}', this.value)">
+      <input type="text" value="${riot}" id="sr_${name}"
+        placeholder="소환사명#태그" style="flex:1;"
+        onchange="updateSummonerRiot('${name}', this.value)">
+      <button class="btn" onclick="deleteSummoner('${name}')"
+        style="border-color:var(--red);color:var(--red);padding:2px 6px;">✕</button>
     </div>
   `).join('');
 }
 
-function saveSummoners() {
-  const allPlayers = [
-    ...state.team1.players,
-    ...state.team2.players,
-  ].filter(p => p.name);
-  const names = allPlayers.length > 0
-    ? [...new Set(allPlayers.map(p => p.name))]
-    : Object.keys(PRESET.summoners);
+function addSummoner() {
+  const name = document.getElementById('newSummonerName').value.trim();
+  const riot = document.getElementById('newSummonerRiot').value.trim();
+  if (!name || !riot) return;
+  cfg.summoners[name] = riot;
+  saveSummonersToStorage();
+  document.getElementById('newSummonerName').value = '';
+  document.getElementById('newSummonerRiot').value = '';
+  renderSummonerInputs();
+  showSummonerSaved();
+}
 
-  names.forEach(name => {
-    const el = document.getElementById('si_' + name);
-    if (el) {
-      cfg.summoners[name] = el.value.trim();
-      // 플레이어 객체에도 반영
-      [...state.team1.players, ...state.team2.players]
-        .filter(p => p.name === name)
-        .forEach(p => p.summoner = cfg.summoners[name]);
-    }
-  });
+function renameSummoner(oldName, newName) {
+  newName = newName.trim();
+  if (!newName || newName === oldName) return;
+  cfg.summoners[newName] = cfg.summoners[oldName];
+  delete cfg.summoners[oldName];
+  saveSummonersToStorage();
+  renderSummonerInputs();
+}
+
+function updateSummonerRiot(name, riot) {
+  cfg.summoners[name] = riot.trim();
+  // 현재 게임 플레이어에도 반영
+  [...state.team1.players, ...state.team2.players]
+    .filter(p => p.name === name)
+    .forEach(p => p.summoner = cfg.summoners[name]);
+  saveSummonersToStorage();
+  showSummonerSaved();
+}
+
+function deleteSummoner(name) {
+  delete cfg.summoners[name];
+  saveSummonersToStorage();
+  renderSummonerInputs();
+}
+
+function saveSummonersToStorage() {
   localStorage.setItem('summoners', JSON.stringify(cfg.summoners));
-  document.getElementById('summonerSaved').textContent = '✓ 저장됨';
-  setTimeout(() => document.getElementById('summonerSaved').textContent = '', 2000);
+}
+
+function saveSummoners() { saveSummonersToStorage(); showSummonerSaved(); }
+
+function showSummonerSaved() {
+  const el = document.getElementById('summonerSaved');
+  if (!el) return;
+  el.textContent = '✓ 저장됨';
+  setTimeout(() => el.textContent = '', 2000);
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────────────────────
